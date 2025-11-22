@@ -1,16 +1,17 @@
 // src/app/admin/events/page.tsx
 import { prisma } from "@/lib/prisma";
-import type { Event, Account, Form, Lead } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 
-// Event inkl. verknüpfter Daten (Account, Forms, Leads)
-type EventWithRelations = Event & {
-  account: Account | null;
-  forms: Form[];
-  leads: Lead[];
-};
+type EventWithRelations = Prisma.EventGetPayload<{
+  include: {
+    account: true;
+    forms: true;
+    leads: true;
+  };
+}>;
 
-export const dynamic = "force-dynamic"; // sicherstellen, dass immer frische Daten geladen werden
+export const dynamic = "force-dynamic";
 
 export default async function AdminEventsPage() {
   const events: EventWithRelations[] = await prisma.event.findMany({
@@ -89,7 +90,12 @@ export default async function AdminEventsPage() {
                       className="border-t border-slate-100 hover:bg-slate-50"
                     >
                       <td className="px-4 py-3 font-medium text-slate-900">
-                        {event.name}
+                        <Link
+                          href={`/admin/events/${event.id}`}
+                          className="underline-offset-2 hover:underline"
+                        >
+                          {event.name}
+                        </Link>
                         {!event.isActive && (
                           <span className="ml-2 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-normal text-slate-700">
                             inaktiv
