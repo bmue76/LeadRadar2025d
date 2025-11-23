@@ -34,10 +34,9 @@ export default async function FormDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // ⬇️ params zuerst auflösen (Next 16: params ist Promise)
+  // Next 16 / React 19: params ist ein Promise
   const { id } = await params;
-
-  console.log("FormDetailPage id =", id);
+  console.log("FormDetailPage params.id =", id);
 
   const forms: FormWithRelations[] = await prisma.form.findMany({
     include: {
@@ -59,7 +58,7 @@ export default async function FormDetailPage({
 
   if (!form) {
     console.warn(
-      "FormDetailPage: Kein Formular mit dieser ID gefunden, id =",
+      "FormDetailPage: Kein Formular mit dieser ID gefunden, params.id =",
       id,
       "Verfügbare IDs:",
       forms.map((f) => f.id)
@@ -106,6 +105,12 @@ export default async function FormDetailPage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/admin/forms/${form.id}/preview`}
+              className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+            >
+              Formular-Preview
+            </Link>
             <Link
               href="/admin/forms"
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
@@ -328,7 +333,7 @@ export default async function FormDetailPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedFields.map((field) => {
+                  {sortedFields.map((field, index) => {
                     let options: string | null = null;
                     if (field.options) {
                       try {
@@ -338,6 +343,12 @@ export default async function FormDetailPage({
                         options = field.options;
                       }
                     }
+
+                    const isFirst = index === 0;
+                    const isLast = index === sortedFields.length - 1;
+
+                    const reorderButtonClasses =
+                      "rounded border border-slate-300 px-1.5 py-0.5 text-[11px] leading-none text-slate-700 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent";
 
                     return (
                       <tr
@@ -363,7 +374,66 @@ export default async function FormDetailPage({
                           {options ?? "–"}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <div className="flex justify-end gap-3">
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {/* Reihenfolge: hoch / runter */}
+                            <form
+                              action="/api/form-fields/reorder"
+                              method="post"
+                              className="inline"
+                            >
+                              <input
+                                type="hidden"
+                                name="fieldId"
+                                value={field.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="formId"
+                                value={form.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="direction"
+                                value="up"
+                              />
+                              <button
+                                type="submit"
+                                disabled={isFirst}
+                                className={reorderButtonClasses}
+                              >
+                                ↑
+                              </button>
+                            </form>
+                            <form
+                              action="/api/form-fields/reorder"
+                              method="post"
+                              className="inline"
+                            >
+                              <input
+                                type="hidden"
+                                name="fieldId"
+                                value={field.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="formId"
+                                value={form.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="direction"
+                                value="down"
+                              />
+                              <button
+                                type="submit"
+                                disabled={isLast}
+                                className={reorderButtonClasses}
+                              >
+                                ↓
+                              </button>
+                            </form>
+
+                            {/* Bearbeiten & Löschen */}
                             <Link
                               href={`/admin/forms/${form.id}/fields/${field.id}`}
                               className="text-xs text-slate-700 hover:underline"
