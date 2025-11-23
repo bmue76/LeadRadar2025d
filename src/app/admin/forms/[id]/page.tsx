@@ -34,7 +34,6 @@ export default async function FormDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  // Next 16 / React 19: params ist ein Promise
   const { id } = await params;
   console.log("FormDetailPage params.id =", id);
 
@@ -105,6 +104,12 @@ export default async function FormDetailPage({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/admin/forms/${form.id}/capture`}
+              className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-500"
+            >
+              Lead erfassen
+            </Link>
             <Link
               href={`/admin/forms/${form.id}/preview`}
               className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
