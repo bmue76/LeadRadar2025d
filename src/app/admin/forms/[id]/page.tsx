@@ -32,11 +32,13 @@ const fieldTypeLabels: Record<string, string> = {
 export default async function FormDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  console.log("FormDetailPage params.id =", params.id);
+  // ⬇️ params zuerst auflösen (Next 16: params ist Promise)
+  const { id } = await params;
 
-  // 1) Alle Formulare holen
+  console.log("FormDetailPage id =", id);
+
   const forms: FormWithRelations[] = await prisma.form.findMany({
     include: {
       account: true,
@@ -53,21 +55,18 @@ export default async function FormDetailPage({
     notFound();
   }
 
-  // 2) Passendes Formular in JS suchen
-  let form = forms.find((f) => f.id === params.id) ?? null;
+  let form = forms.find((f) => f.id === id) ?? null;
 
   if (!form) {
     console.warn(
-      "FormDetailPage: Kein Formular mit dieser ID gefunden, params.id =",
-      params.id,
+      "FormDetailPage: Kein Formular mit dieser ID gefunden, id =",
+      id,
       "Verfügbare IDs:",
       forms.map((f) => f.id)
     );
-    // Fallback: erstes Formular anzeigen
     form = forms[0];
   }
 
-  // Felder lokal nach 'order' sortieren
   const sortedFields = [...form.fields].sort((a, b) => a.order - b.order);
 
   const createdAt = new Date(form.createdAt).toLocaleString("de-CH", {
@@ -364,28 +363,36 @@ export default async function FormDetailPage({
                           {options ?? "–"}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <form
-                            action="/api/form-fields/delete"
-                            method="post"
-                            className="inline"
-                          >
-                            <input
-                              type="hidden"
-                              name="fieldId"
-                              value={field.id}
-                            />
-                            <input
-                              type="hidden"
-                              name="formId"
-                              value={form.id}
-                            />
-                            <button
-                              type="submit"
-                              className="text-xs text-red-600 hover:underline"
+                          <div className="flex justify-end gap-3">
+                            <Link
+                              href={`/admin/forms/${form.id}/fields/${field.id}`}
+                              className="text-xs text-slate-700 hover:underline"
                             >
-                              Löschen
-                            </button>
-                          </form>
+                              Bearbeiten
+                            </Link>
+                            <form
+                              action="/api/form-fields/delete"
+                              method="post"
+                              className="inline"
+                            >
+                              <input
+                                type="hidden"
+                                name="fieldId"
+                                value={field.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="formId"
+                                value={form.id}
+                              />
+                              <button
+                                type="submit"
+                                className="text-xs text-red-600 hover:underline"
+                              >
+                                Löschen
+                              </button>
+                            </form>
+                          </div>
                         </td>
                       </tr>
                     );
