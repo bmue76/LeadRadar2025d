@@ -67,6 +67,9 @@ export default async function FormDetailPage({
     form = forms[0];
   }
 
+  // Felder lokal nach 'order' sortieren
+  const sortedFields = [...form.fields].sort((a, b) => a.order - b.order);
+
   const createdAt = new Date(form.createdAt).toLocaleString("de-CH", {
     day: "2-digit",
     month: "2-digit",
@@ -84,8 +87,8 @@ export default async function FormDetailPage({
   });
 
   const nextOrder =
-    form.fields.length > 0
-      ? Math.max(...form.fields.map((f) => f.order)) + 1
+    sortedFields.length > 0
+      ? sortedFields[sortedFields.length - 1].order + 1
       : 1;
 
   return (
@@ -181,7 +184,7 @@ export default async function FormDetailPage({
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-500">Anzahl Felder</dt>
-                <dd className="text-slate-900">{form.fields.length}</dd>
+                <dd className="text-slate-900">{sortedFields.length}</dd>
               </div>
               <div className="flex justify-between gap-4">
                 <dt className="text-slate-500">Anzahl Leads</dt>
@@ -307,7 +310,7 @@ export default async function FormDetailPage({
           </form>
 
           {/* Bestehende Felder */}
-          {form.fields.length === 0 ? (
+          {sortedFields.length === 0 ? (
             <p className="text-sm text-slate-600">
               Dieses Formular enthält noch keine Felder.
             </p>
@@ -322,10 +325,11 @@ export default async function FormDetailPage({
                     <th className="px-3 py-2">Pflichtfeld</th>
                     <th className="px-3 py-2">Placeholder</th>
                     <th className="px-3 py-2">Optionen</th>
+                    <th className="px-3 py-2 text-right">Aktionen</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {form.fields.map((field) => {
+                  {sortedFields.map((field) => {
                     let options: string | null = null;
                     if (field.options) {
                       try {
@@ -358,6 +362,30 @@ export default async function FormDetailPage({
                         </td>
                         <td className="px-3 py-2 text-slate-700">
                           {options ?? "–"}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <form
+                            action="/api/form-fields/delete"
+                            method="post"
+                            className="inline"
+                          >
+                            <input
+                              type="hidden"
+                              name="fieldId"
+                              value={field.id}
+                            />
+                            <input
+                              type="hidden"
+                              name="formId"
+                              value={form.id}
+                            />
+                            <button
+                              type="submit"
+                              className="text-xs text-red-600 hover:underline"
+                            >
+                              Löschen
+                            </button>
+                          </form>
                         </td>
                       </tr>
                     );
