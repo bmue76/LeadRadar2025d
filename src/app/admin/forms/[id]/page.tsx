@@ -433,6 +433,30 @@ export default async function FormDetailPage({
                               </button>
                             </form>
 
+                            {/* Duplizieren */}
+                            <form
+                              action="/api/form-fields/duplicate"
+                              method="post"
+                              className="inline"
+                            >
+                              <input
+                                type="hidden"
+                                name="fieldId"
+                                value={field.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="formId"
+                                value={form.id}
+                              />
+                              <button
+                                type="submit"
+                                className="text-xs text-slate-700 hover:underline"
+                              >
+                                Duplizieren
+                              </button>
+                            </form>
+
                             {/* Bearbeiten & Löschen */}
                             <Link
                               href={`/admin/forms/${form.id}/fields/${field.id}`}
