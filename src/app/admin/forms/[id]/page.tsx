@@ -36,7 +36,7 @@ export default async function FormDetailPage({
 }) {
   console.log("FormDetailPage params.id =", params.id);
 
-  // 1) Alle Formulare mit Relationen holen
+  // 1) Alle Formulare holen
   const forms: FormWithRelations[] = await prisma.form.findMany({
     include: {
       account: true,
@@ -50,14 +50,12 @@ export default async function FormDetailPage({
   });
 
   if (forms.length === 0) {
-    // Es gibt wirklich gar keine Formulare
     notFound();
   }
 
-  // 2) Formular mit passender ID in JS suchen
+  // 2) Passendes Formular in JS suchen
   let form = forms.find((f) => f.id === params.id) ?? null;
 
-  // Debug-Ausgabe, falls nichts gefunden wird
   if (!form) {
     console.warn(
       "FormDetailPage: Kein Formular mit dieser ID gefunden, params.id =",
@@ -65,7 +63,7 @@ export default async function FormDetailPage({
       "Verfügbare IDs:",
       forms.map((f) => f.id)
     );
-    // Fallback: erstes Formular anzeigen, statt 404
+    // Fallback: erstes Formular anzeigen
     form = forms[0];
   }
 
@@ -84,6 +82,11 @@ export default async function FormDetailPage({
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const nextOrder =
+    form.fields.length > 0
+      ? Math.max(...form.fields.map((f) => f.order)) + 1
+      : 1;
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -188,12 +191,122 @@ export default async function FormDetailPage({
           </div>
         </section>
 
-        {/* Feld-Liste */}
+        {/* Formularfelder + Neues Feld */}
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            Formularfelder
-          </h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Formularfelder
+            </h2>
+            <p className="text-xs text-slate-500">
+              Neues Feld unten hinzufügen. Optionen mit Komma trennen.
+            </p>
+          </div>
 
+          {/* Neues Feld hinzufügen */}
+          <form
+            action="/api/form-fields"
+            method="post"
+            className="mb-6 space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3"
+          >
+            <input type="hidden" name="formId" value={form.id} />
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-600">
+                  Label *
+                </label>
+                <input
+                  name="label"
+                  required
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  placeholder="z.B. Firmenname"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-600">
+                  Feldtyp *
+                </label>
+                <select
+                  name="type"
+                  required
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm bg-white"
+                  defaultValue="TEXT"
+                >
+                  {Object.entries(fieldTypeLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-600">
+                  Reihenfolge
+                </label>
+                <input
+                  name="order"
+                  type="number"
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  defaultValue={nextOrder}
+                  min={1}
+                />
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <label className="block text-xs font-medium text-slate-600">
+                  Placeholder
+                </label>
+                <input
+                  name="placeholder"
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                  placeholder="z.B. Bitte E-Mail-Adresse eingeben"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[auto,1fr] items-center">
+              <div className="flex items-center gap-2">
+                <input
+                  id="required"
+                  name="required"
+                  type="checkbox"
+                  defaultChecked
+                  className="h-4 w-4 rounded border-slate-300"
+                />
+                <label
+                  htmlFor="required"
+                  className="text-xs font-medium text-slate-600"
+                >
+                  Pflichtfeld
+                </label>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-600">
+                  Optionen (kommagetrennt, z.B. Kalt, Warm, Heiss)
+                </label>
+                <input
+                  name="options"
+                  className="w-full rounded-md border border-slate-300 px-2 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                Feld hinzufügen
+              </button>
+            </div>
+          </form>
+
+          {/* Bestehende Felder */}
           {form.fields.length === 0 ? (
             <p className="text-sm text-slate-600">
               Dieses Formular enthält noch keine Felder.
