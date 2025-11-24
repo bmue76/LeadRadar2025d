@@ -23,12 +23,34 @@ type LeadWithValues = Prisma.LeadGetPayload<{
 
 export const dynamic = "force-dynamic";
 
+const ALLOWED_STATUSES = [
+  "NEW",
+  "OPEN",
+  "QUALIFIED",
+  "WON",
+  "LOST",
+  "ARCHIVED",
+] as const;
+
+type LeadStatus = (typeof ALLOWED_STATUSES)[number];
+
 export default async function FormLeadsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string }>;
 }) {
   const { id } = await params;
+  const { status } = await searchParams;
+
+  // Status aus Querystring prüfen
+  const normalizedStatus = status?.toUpperCase();
+  const statusFilter: LeadStatus | undefined = ALLOWED_STATUSES.includes(
+    normalizedStatus as LeadStatus
+  )
+    ? (normalizedStatus as LeadStatus)
+    : undefined;
 
   const form: FormWithContext | null = await prisma.form.findUnique({
     where: { id },
@@ -42,8 +64,17 @@ export default async function FormLeadsPage({
     notFound();
   }
 
+  // Where-Bedingung für Prisma dynamisch aufbauen
+  const where: Prisma.LeadWhereInput = {
+    formId: id,
+  };
+
+  if (statusFilter) {
+    where.status = statusFilter;
+  }
+
   const leads: LeadWithValues[] = await prisma.lead.findMany({
-    where: { formId: id },
+    where,
     include: {
       values: {
         include: {
@@ -110,6 +141,10 @@ export default async function FormLeadsPage({
       .filter(Boolean);
   };
 
+  const activeFilter = statusFilter ?? "ALL";
+
+  const filterOptions: (LeadStatus | "ALL")[] = ["ALL", ...ALLOWED_STATUSES];
+
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -160,13 +195,16 @@ export default async function FormLeadsPage({
         <section className="grid gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Leads gesamt
+              Leads gesamt (Filter)
             </h2>
             <p className="mt-2 text-2xl font-bold text-slate-900">
               {totalLeads}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Anzahl der erfassten Leads für dieses Formular.
+              Aktueller Filter:{" "}
+              <span className="font-semibold">
+                {activeFilter === "ALL" ? "Alle" : activeFilter}
+              </span>
             </p>
           </div>
 
@@ -178,7 +216,7 @@ export default async function FormLeadsPage({
               {latestAt ?? "–"}
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Zeitpunkt des zuletzt erfassten Leads.
+              Zeitpunkt des zuletzt erfassten Leads im aktuellen Filter.
             </p>
           </div>
 
@@ -192,6 +230,44 @@ export default async function FormLeadsPage({
             <p className="mt-1 text-xs text-slate-500">
               {form.event?.location ?? "–"}
             </p>
+          </div>
+        </section>
+
+        {/* Status-Filter */}
+        <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Nach Status filtern
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {filterOptions.map((option) => {
+                const isActive = activeFilter === option;
+                const label =
+                  option === "ALL"
+                    ? "Alle"
+                    : option === "NEW"
+                    ? "NEW"
+                    : option;
+                const href =
+                  option === "ALL"
+                    ? `/admin/forms/${form.id}/leads`
+                    : `/admin/forms/${form.id}/leads?status=${option}`;
+
+                return (
+                  <Link
+                    key={option}
+                    href={href}
+                    className={`rounded-full border px-2 py-1 text-xs ${
+                      isActive
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </section>
 
@@ -209,7 +285,7 @@ export default async function FormLeadsPage({
 
           {leads.length === 0 ? (
             <p className="text-sm text-slate-600">
-              Es wurden noch keine Leads für dieses Formular erfasst.
+              Für diesen Filter wurden keine Leads gefunden.
             </p>
           ) : (
             <div className="overflow-x-auto">
