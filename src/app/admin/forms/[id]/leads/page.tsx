@@ -4,6 +4,13 @@ import type { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+type FormWithContext = Prisma.FormGetPayload<{
+  include: {
+    account: true;
+    event: true;
+  };
+}>;
+
 type LeadWithValues = Prisma.LeadGetPayload<{
   include: {
     values: {
@@ -14,47 +21,7 @@ type LeadWithValues = Prisma.LeadGetPayload<{
   };
 }>;
 
-type FormWithFields = Prisma.FormGetPayload<{
-  include: {
-    account: true;
-    event: true;
-    fields: true;
-  };
-}>;
-
 export const dynamic = "force-dynamic";
-
-const statusLabels: Record<string, string> = {
-  NEW: "Neu",
-  OPEN: "In Bearbeitung",
-  QUALIFIED: "Qualifiziert",
-  WON: "Gewonnen",
-  LOST: "Verloren",
-  ARCHIVED: "Archiviert",
-};
-
-function formatStatus(status: unknown): string {
-  // Wir akzeptieren alles (Enum, string, null, undefined)
-  if (!status) return "Neu";
-  const key = String(status);
-  return statusLabels[key] ?? key;
-}
-
-function formatFieldValue(raw: string | null): string {
-  if (!raw) return "–";
-
-  // Multi-Select / JSON-Array versuchen zu erkennen
-  try {
-    const parsed = JSON.parse(raw);
-    if (Array.isArray(parsed)) {
-      return parsed.join(", ");
-    }
-  } catch {
-    // ignorieren, wenn kein valides JSON
-  }
-
-  return raw;
-}
 
 export default async function FormLeadsPage({
   params,
@@ -63,12 +30,11 @@ export default async function FormLeadsPage({
 }) {
   const { id } = await params;
 
-  const form: FormWithFields | null = await prisma.form.findUnique({
+  const form: FormWithContext | null = await prisma.form.findUnique({
     where: { id },
     include: {
       account: true,
       event: true,
-      fields: true,
     },
   });
 
@@ -80,7 +46,9 @@ export default async function FormLeadsPage({
     where: { formId: id },
     include: {
       values: {
-        include: { field: true },
+        include: {
+          field: true,
+        },
       },
     },
     orderBy: {
@@ -88,15 +56,59 @@ export default async function FormLeadsPage({
     },
   });
 
-  const sortedFields = [...form.fields].sort((a, b) => a.order - b.order);
-  // Wir zeigen in der Tabelle die ersten 3 Felder des Formulars an
-  const displayFields = sortedFields.slice(0, 3);
-
   const eventInfo = form.event
     ? `${form.event.name}${
         form.event.location ? ` · ${form.event.location}` : ""
       }`
     : "Kein Event zugeordnet";
+
+  const totalLeads = leads.length;
+  const latestLead = leads[0];
+
+  const latestAt =
+    latestLead &&
+    new Date(latestLead.createdAt).toLocaleString("de-CH", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+  const getImportantValues = (lead: LeadWithValues): string[] => {
+    if (!lead.values || lead.values.length === 0) return [];
+
+    const importantLabels = [
+      "name",
+      "vorname",
+      "nachname",
+      "firma",
+      "company",
+      "unternehmen",
+      "email",
+      "e-mail",
+      "telefon",
+      "phone",
+    ];
+
+    const lowered = (s: string) => s.toLowerCase();
+
+    const sorted = [...lead.values].sort((a, b) => {
+      const aImportant = importantLabels.some((label) =>
+        lowered(a.field.label).includes(label)
+      );
+      const bImportant = importantLabels.some((label) =>
+        lowered(b.field.label).includes(label)
+      );
+      if (aImportant === bImportant) return a.field.order - b.field.order;
+      return aImportant ? -1 : 1;
+    });
+
+    return sorted
+      .slice(0, 3)
+      .map((v) => `${v.field.label}: ${v.value ?? ""}`.trim())
+      .filter(Boolean);
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10">
@@ -118,9 +130,7 @@ export default async function FormLeadsPage({
               Account:{" "}
               <span className="font-medium">
                 {form.account?.name ?? "–"}
-              </span>{" "}
-              · Anzahl Leads:{" "}
-              <span className="font-medium">{leads.length}</span>
+              </span>
             </p>
           </div>
 
@@ -132,97 +142,138 @@ export default async function FormLeadsPage({
               Lead erfassen
             </Link>
             <Link
+              href={`/admin/forms/${form.id}/leads/export`}
+              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
+            >
+              CSV-Export
+            </Link>
+            <Link
               href={`/admin/forms/${form.id}`}
               className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
             >
               Zurück zu den Formulardetails
             </Link>
-            <Link
-              href="/admin/forms"
-              className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
-            >
-              Formular-Übersicht
-            </Link>
           </div>
         </header>
 
-        {/* Lead-Liste */}
+        {/* Zusammenfassung */}
+        <section className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Leads gesamt
+            </h2>
+            <p className="mt-2 text-2xl font-bold text-slate-900">
+              {totalLeads}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Anzahl der erfassten Leads für dieses Formular.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Zuletzt erfasst
+            </h2>
+            <p className="mt-2 text-sm text-slate-900">
+              {latestAt ?? "–"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Zeitpunkt des zuletzt erfassten Leads.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Event
+            </h2>
+            <p className="mt-2 text-sm font-medium text-slate-900">
+              {form.event?.name ?? "Kein Event zugeordnet"}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {form.event?.location ?? "–"}
+            </p>
+          </div>
+        </section>
+
+        {/* Lead-Tabelle */}
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Lead-Liste
+            </h2>
+            <p className="text-xs text-slate-500">
+              Die wichtigsten Feldwerte werden inline angezeigt. Weitere Details
+              sind in der Lead-Detailansicht sichtbar.
+            </p>
+          </div>
+
           {leads.length === 0 ? (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600">
-                Für dieses Formular wurden noch keine Leads erfasst.
-              </p>
-              <Link
-                href={`/admin/forms/${form.id}/capture`}
-                className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
-              >
-                Jetzt ersten Lead erfassen
-              </Link>
-            </div>
+            <p className="text-sm text-slate-600">
+              Es wurden noch keine Leads für dieses Formular erfasst.
+            </p>
           ) : (
-            <>
-              <p className="mb-3 text-xs text-slate-500">
-                Es werden die ersten drei Formularfelder als Spalten angezeigt.
-                Die Detailansicht und Export-Funktionen können später ergänzt
-                werden.
-              </p>
-              <div className="overflow-x-auto">
-                <table className="min-w-full border-collapse text-left text-sm">
-                  <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-700">
-                    <tr>
-                      <th className="px-3 py-2">Erfasst am</th>
-                      <th className="px-3 py-2">Status</th>
-                      {displayFields.map((field) => (
-                        <th key={field.id} className="px-3 py-2">
-                          {field.label}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leads.map((lead) => {
-                      const createdAt = new Date(
-                        lead.createdAt
-                      ).toLocaleString("de-CH", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      });
+            <div className="overflow-x-auto">
+              <table className="min-w-full border-collapse text-left text-sm">
+                <thead className="bg-slate-100 text-xs font-semibold uppercase text-slate-700">
+                  <tr>
+                    <th className="px-3 py-2">Erfasst am</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Wichtige Angaben</th>
+                    <th className="px-3 py-2">Details</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((lead) => {
+                    const createdAt = new Date(
+                      lead.createdAt
+                    ).toLocaleString("de-CH", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
 
-                      const valueMap: Record<string, string | null> = {};
-                      lead.values.forEach((v) => {
-                        valueMap[v.fieldId] = v.value;
-                      });
+                    const importantValues = getImportantValues(lead);
 
-                      return (
-                        <tr
-                          key={lead.id}
-                          className="border-t border-slate-100 hover:bg-slate-50"
-                        >
-                          <td className="px-3 py-2 text-slate-800">
-                            {createdAt}
-                          </td>
-                          <td className="px-3 py-2 text-slate-800">
-                            {formatStatus((lead as any).status)}
-                          </td>
-                          {displayFields.map((field) => (
-                            <td
-                              key={field.id}
-                              className="px-3 py-2 text-slate-800"
-                            >
-                              {formatFieldValue(valueMap[field.id] ?? null)}
-                            </td>
-                          ))}
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </>
+                    return (
+                      <tr
+                        key={lead.id}
+                        className="border-t border-slate-100 hover:bg-slate-50"
+                      >
+                        <td className="px-3 py-2 text-slate-800">
+                          {createdAt}
+                        </td>
+                        <td className="px-3 py-2 text-slate-800">
+                          {lead.status ?? "–"}
+                        </td>
+                        <td className="px-3 py-2 text-slate-800">
+                          {importantValues.length === 0 ? (
+                            <span className="text-slate-500">
+                              Keine Feldwerte vorhanden
+                            </span>
+                          ) : (
+                            <ul className="list-inside list-disc space-y-0.5">
+                              {importantValues.map((v) => (
+                                <li key={v}>{v}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-slate-800">
+                          <Link
+                            href={`/admin/forms/${form.id}/leads/${lead.id}`}
+                            className="text-xs font-medium text-slate-700 hover:underline"
+                          >
+                            Anzeigen &amp; bearbeiten
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>
