@@ -26,6 +26,7 @@ model User {
   id        String   @id @default(cuid())
   email     String   @unique
   name      String?
+  passwordHash String?   // Passwort-Hash (optional, damit Migration sicher durchgeht)
   role      UserRole @default(USER)
   accountId String
   account   Account  @relation(fields: [accountId], references: [id])
