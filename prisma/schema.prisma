@@ -127,6 +127,7 @@ model Lead {
   createdByUser   User?   @relation("UserLeads", fields: [createdByUserId], references: [id])
 
   status    LeadStatus @default(NEW)
+  notes     String?      // NEU: Freitext-Notizen zum Lead
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 

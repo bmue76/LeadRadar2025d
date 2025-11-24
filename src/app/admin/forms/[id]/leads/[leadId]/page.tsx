@@ -125,7 +125,7 @@ export default async function LeadDetailPage({
           </div>
         </header>
 
-        {/* Meta + Status */}
+        {/* Meta + Status/Notizen */}
         <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -151,7 +151,7 @@ export default async function LeadDetailPage({
 
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Status bearbeiten
+              Status &amp; Notizen
             </h2>
             <form
               action="/api/leads/status"
@@ -183,11 +183,29 @@ export default async function LeadDetailPage({
                 </select>
               </div>
 
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-slate-600">
+                  Notizen zum Lead
+                </label>
+                <textarea
+                  name="notes"
+                  defaultValue={lead.notes ?? ""}
+                  rows={5}
+                  className="w-full rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                  placeholder="Gesprächsnotizen, To-dos, Follow-up, nächste Schritte..."
+                />
+                <p className="text-xs text-slate-500">
+                  Diese Notizen sind nur intern sichtbar und werden nicht
+                  exportiert (können wir später optional in den Export
+                  aufnehmen).
+                </p>
+              </div>
+
               <button
                 type="submit"
                 className="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
               >
-                Status speichern
+                Änderungen speichern
               </button>
             </form>
           </div>

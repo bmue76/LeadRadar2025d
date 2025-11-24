@@ -18,6 +18,8 @@ export async function POST(request: NextRequest) {
     const leadId = formData.get("leadId")?.toString();
     const formId = formData.get("formId")?.toString();
     const status = formData.get("status")?.toString();
+    const notes = formData.get("notes")?.toString() ?? undefined;
+
     const redirectTo =
       formData.get("redirectTo")?.toString() ||
       (leadId && formId
@@ -28,14 +30,19 @@ export async function POST(request: NextRequest) {
       return new NextResponse("leadId oder status fehlt", { status: 400 });
     }
 
-    if (!ALLOWED_STATUSES.includes(status as (typeof ALLOWED_STATUSES)[number])) {
+    if (
+      !(
+        ALLOWED_STATUSES as readonly string[]
+      ).includes(status.toUpperCase())
+    ) {
       return new NextResponse("Ungültiger Status-Wert", { status: 400 });
     }
 
     await prisma.lead.update({
       where: { id: leadId },
       data: {
-        status: status as any,
+        status: status.toUpperCase() as any,
+        ...(notes !== undefined ? { notes } : {}),
       },
     });
 
@@ -46,7 +53,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Fehler beim Aktualisieren des Lead-Status:", error);
+    console.error("Fehler beim Aktualisieren des Leads:", error);
     return new NextResponse("Interner Serverfehler", { status: 500 });
   }
 }
